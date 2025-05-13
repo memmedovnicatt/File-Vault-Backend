@@ -25,7 +25,6 @@ public class MinIoConfig {
     @Value("${minio.default-buckets}")
     private String[] defaultBuckets;
 
-
     @Value("${minio.presignedUrlExpiry}")
     private int presignedUrlExpiry;
 

@@ -2,13 +2,19 @@ package com.nicat.filevaultbackend.controller;
 
 import com.nicat.filevaultbackend.dao.entity.FileMetaData;
 import com.nicat.filevaultbackend.service.FileMetaDataService;
+import io.minio.errors.*;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,7 +28,7 @@ public class FileMetaDataController {
                                     @RequestParam String password,
                                     @RequestParam String bucketName) {
         fileMetaDataService.upload(multipartFile, password, bucketName);
-        return ResponseEntity.ok("is success");
+        return ResponseEntity.ok("File uploaded successfully");
     }
 
 
@@ -56,5 +62,14 @@ public class FileMetaDataController {
                                        @RequestParam Long fileId) {
         fileMetaDataService.update(downloadLimit, fileId);
         return ResponseEntity.ok().build();
+    }
+
+    @Operation(summary = "Generate url for minio bucket and file name")
+    @ApiResponse(responseCode = "200", description = "Url successfully generated ")
+    @PostMapping("/generate-url")
+    public ResponseEntity<String> generatePresignedUrl(@RequestParam String bucketName,
+                                                       @RequestParam String fileName) throws Exception {
+        String url = fileMetaDataService.presignedUrl(bucketName, fileName);
+        return ResponseEntity.ok(url);
     }
 }

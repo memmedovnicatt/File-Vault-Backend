@@ -22,7 +22,7 @@ public class SchedulerServiceImpl implements SchedulerService {
 
     @Override
     @Scheduled(fixedRate = 3600000)//every 1 hour
-    public void expiredFileCleanUp() {
+    public void     expiredFileCleanUp() {
         String bucketName = "my-bucket";
         List<FileMetaData> expiredFiles =
                 fileMetaDataRepository.findByExpirationDateBefore(LocalDateTime.now());

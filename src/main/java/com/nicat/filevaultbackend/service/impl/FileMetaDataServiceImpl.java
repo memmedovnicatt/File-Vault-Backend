@@ -7,13 +7,19 @@ import com.nicat.filevaultbackend.model.enums.exception.child.NotFoundException;
 import com.nicat.filevaultbackend.model.enums.exception.child.PasswordMismatchException;
 import com.nicat.filevaultbackend.service.FileMetaDataService;
 import io.minio.*;
+import io.minio.errors.*;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.ErrorResponseException;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.AccessDeniedException;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 
 
@@ -24,6 +30,9 @@ public class FileMetaDataServiceImpl implements FileMetaDataService {
     private final FileMetaDataRepository fileMetaDataRepository;
     private final MinioClient minioClient;
     private final BCryptPasswordEncoder passwordEncoder;
+
+    @Value("${minio.presignedUrlExpiry}")
+    private int presignedUrlExpiry;
 
     @Override
     public void upload(MultipartFile multipartFile, String password, String bucketName) {
@@ -128,6 +137,51 @@ public class FileMetaDataServiceImpl implements FileMetaDataService {
                         .build()
         )) {
             return response.readAllBytes();
+        }
+    }
+
+    @Override
+    public String presignedUrl(String bucketName, String fileName) throws ServerException, InsufficientDataException, io.minio.errors.ErrorResponseException, IOException, NoSuchAlgorithmException, InvalidKeyException, InvalidResponseException, XmlParserException, InternalException {
+        boolean exists = isBucketAndFileExist(bucketName, fileName);
+        if (exists) {
+            String presignedUrl = minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(bucketName)
+                            .object(fileName)
+                            .expiry(presignedUrlExpiry)
+                            .build());
+            return presignedUrl;
+        } else {
+            throw new NotFoundException("Bucket or file does not exists");
+        }
+    }
+
+    public boolean isBucketAndFileExist(String bucketName, String fileName) {
+        try {
+            boolean bucketExists = minioClient.bucketExists(
+                    BucketExistsArgs.builder().bucket(bucketName).build()
+            );
+            if (!bucketExists) {
+                log.info("Bucket does not exists");
+                return false;
+            }
+            minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(fileName)
+                            .build()
+            );
+            log.info("Bucket and file are exists");
+            return true;
+        } catch (ErrorResponseException e) {
+            if (e.getMessage().contains("The specified key does not exist")) {
+                return false;
+            }
+            throw new RuntimeException("MinIO check error: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.info("LLL");
+            throw new RuntimeException("MinIO error: " + e.getMessage(), e);
         }
     }
 }
